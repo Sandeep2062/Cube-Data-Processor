@@ -3,7 +3,7 @@ name: Build and Release Windows EXE
 on:
   push:
     tags:
-      - 'v*' # This triggers the build when you push a tag like v3.1, v3.2
+      - 'v*' 
 
 jobs:
   build:
@@ -22,18 +22,23 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install pyinstaller openpyxl
+          pip install pyinstaller openpyxl Pillow
 
       - name: Build EXE with PyInstaller
-        # This combines your friend's hidden imports with our automation
+        # Updated with icon, logo, and friend's hidden import suggestions
         run: |
           pyinstaller --onefile --noconsole `
           --name "Cube-${{ github.ref_name }}" `
+          --icon="icon.ico" `
+          --add-data "segoeui.ttf;." `
+          --add-data "logo.png;." `
+          --add-data "icon.ico;." `
           --hidden-import=openpyxl `
           --hidden-import=openpyxl.cell `
           --hidden-import=openpyxl.styles `
           --hidden-import=openpyxl.drawing.image `
-          --add-data "segoeui.ttf;." `
+          --hidden-import=PIL `
+          --collect-all openpyxl `
           Cube.py
 
       - name: Create GitHub Release

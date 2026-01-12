@@ -1,0 +1,34 @@
+name: Build and Release Windows EXE
+on:
+  push:
+    tags:
+      - 'v*' # This triggers the build only when you push a tag like v1.0, v2.0
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write # Important: Gives GitHub permission to create a release
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install PyInstaller
+        run: pip install pyinstaller
+
+      - name: Build EXE
+        # It uses the tag name (v1.0) to name the file automatically
+        run: pyinstaller --onefile --noconsole --name "Cube-${{ github.ref_name }}" --add-data "segoeui.ttf;." Cube.py
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.exe
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false

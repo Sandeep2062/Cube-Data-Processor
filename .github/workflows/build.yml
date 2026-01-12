@@ -1,27 +1,32 @@
 name: Build and Release Windows EXE
+
 on:
   push:
     tags:
-      - 'v*' # This triggers the build only when you push a tag like v1.0, v2.0
+      - 'v*' # This triggers the build when you push a tag like v3.1, v4.0
 
 jobs:
   build:
     runs-on: windows-latest
     permissions:
-      contents: write # Important: Gives GitHub permission to create a release
+      contents: write # Allows GitHub to upload the EXE to your Releases
+      
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
       
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Install PyInstaller
-        run: pip install pyinstaller
+      - name: Install Dependencies
+        run: |
+          pip install pyinstaller openpyxl
+          # If you use other libraries (like pygame), add them to the line above
 
-      - name: Build EXE
-        # It uses the tag name (v1.0) to name the file automatically
+      - name: Build EXE with PyInstaller
+        # This names the EXE based on your tag (e.g., Cube-v3.1.exe)
         run: pyinstaller --onefile --noconsole --name "Cube-${{ github.ref_name }}" --add-data "segoeui.ttf;." Cube.py
 
       - name: Create GitHub Release
@@ -32,3 +37,5 @@ jobs:
           name: Release ${{ github.ref_name }}
           draft: false
           prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

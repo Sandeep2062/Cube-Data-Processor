@@ -3,7 +3,7 @@ name: Build and Release Windows EXE
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*' # Trigger on tags like v9.0, v10.1, etc.
 
 jobs:
   build:
@@ -27,15 +27,13 @@ jobs:
       - name: Build EXE with PyInstaller
         run: |
           pyinstaller --onefile --noconsole `
-          --name "Cube-Processor-${{ github.ref_name }}" `
+          --name "Cube-Data-Processor-${{ github.ref_name }}" `
           --icon="icon.ico" `
           --add-data "logo.png;." `
           --add-data "icon.ico;." `
-          --hidden-import=openpyxl.cell `
-          --hidden-import=openpyxl.styles `
-          --hidden-import=openpyxl.drawing.image `
           --collect-all customtkinter `
           --collect-all openpyxl `
+          --hidden-import=PIL `
           Cube.py
 
       - name: Create GitHub Release
@@ -43,8 +41,13 @@ jobs:
         with:
           files: dist/*.exe
           tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
-          body: "Automated Build for Cube Data Processor ${{ github.ref_name }}"
+          # This line below sets the title you wanted
+          name: "Automated Build for Cube Data Processor ${{ github.ref_name }}"
+          body: |
+            ### 🚀 New Release: ${{ github.ref_name }}
+            - Modern UI with CustomTkinter
+            - Registry-based settings (Windows)
+            - Automated Excel data processing
           draft: false
           prerelease: false
         env:

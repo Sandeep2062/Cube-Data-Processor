@@ -3,7 +3,7 @@ name: Build and Release Windows EXE
 on:
   push:
     tags:
-      - 'v*' # Trigger on tags like v9.0, v10.1, etc.
+      - 'v*' 
 
 jobs:
   build:

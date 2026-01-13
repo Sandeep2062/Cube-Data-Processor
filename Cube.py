@@ -10,11 +10,11 @@ import shutil
 
 """
 ╔══════════════════════════════════════════════════════════════════╗
-║                    CUBE DATA PROCESSOR v3.1                       ║
+║                    CUBE DATA PROCESSOR v5                       ║
 ║                                                                   ║
 ║  Developer: Sandeep (https://github.com/Sandeep2062)            ║
 ║  Repository: https://github.com/Sandeep2062/Cube-Merge          ║
-║  Description: Excel data processor with logo preservation        ║
+║  Description: Excel data processor                                ║
 ║                                                                   ║
 ║  © 2025 Sandeep - All Rights Reserved                           ║
 ╚══════════════════════════════════════════════════════════════════╝

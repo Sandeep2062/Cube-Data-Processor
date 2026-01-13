@@ -451,8 +451,13 @@ gradient_frame.place(x=0, y=0, relwidth=1, relheight=1)
 
 # Create gradient effect
 for i in range(100):
-    color_value = int(67 + (10 - 67) * (i / 100))  # Gradient from ACCENT_PRIMARY to BG_PRIMARY
-    color = f"#{color_value:02x}{97 + (14 - 97) * (i / 100):02x}{238 + (39 - 238) * (i / 100):02x}"
+    # Calculate color values and convert to integers
+    r = int(67 + (10 - 67) * (i / 100))  # Red channel
+    g = int(97 + (14 - 97) * (i / 100))  # Green channel  
+    b = int(238 + (39 - 238) * (i / 100))  # Blue channel
+    
+    # Format as hex color
+    color = f"#{r:02x}{g:02x}{b:02x}"
     frame = tk.Frame(gradient_frame, bg=color, height=1)
     frame.place(x=0, y=i, relwidth=1)
 

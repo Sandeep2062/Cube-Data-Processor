@@ -372,7 +372,6 @@ root = tk.Tk()
 root.title("Cube Data Processor")
 root.geometry("1000x900")
 root.minsize(950, 850)
-root.configure(bg="#0f0f0f")
 
 try:
     root.iconbitmap("icon.ico")
@@ -388,89 +387,127 @@ output_path = tk.StringVar(value=settings.get("output_path", ""))
 calendar_path = tk.StringVar(value=settings.get("calendar_path", ""))
 mode_var = tk.StringVar(value="both")
 
-# Enhanced Dark Colors
-BG_DARK = "#0f0f0f"
-BG_CARD = "#1a1a1a"
-BG_CARD_HOVER = "#252525"
-BG_INPUT = "#242424"
-TEXT_PRIMARY = "#ffffff"
-TEXT_SECONDARY = "#a0a0a0"
-ACCENT_TEAL = "#0d9488"
-ACCENT_GREEN = "#10b981"
-BORDER_COLOR = "#2a2a2a"
-HOVER_COLOR = "#1e3a3a"
+# Enhanced Color Scheme
+BG_PRIMARY = "#0a0e27"          # Deep blue-black
+BG_SECONDARY = "#151933"        # Slightly lighter blue-black
+BG_CARD = "#1e2140"             # Card background
+BG_HOVER = "#252850"            # Hover state
+BG_INPUT = "#1a1d3a"            # Input field background
+TEXT_PRIMARY = "#ffffff"        # White text
+TEXT_SECONDARY = "#a0a9c9"      # Light blue-gray text
+ACCENT_PRIMARY = "#4361ee"      # Primary blue
+ACCENT_SECONDARY = "#3f37c9"    # Secondary blue
+ACCENT_SUCCESS = "#06ffa5"      # Bright green for success
+ACCENT_WARNING = "#ffbe0b"      # Amber for warnings
+BORDER_COLOR = "#2a2e5a"        # Border color
+PROGRESS_COLOR = "#06ffa5"      # Progress bar color
+
+# Set root background
+root.configure(bg=BG_PRIMARY)
 
 # Styles
 style = ttk.Style()
 style.theme_use('clam')
 
-style.configure('Dark.TButton', padding=9, relief="flat", background=ACCENT_TEAL, 
-                foreground="white", font=("Segoe UI", 9), borderwidth=0)
-style.map('Dark.TButton', background=[('active', '#0a6b62')])
+# Configure button styles
+style.configure('Primary.TButton', 
+                padding=12, 
+                relief="flat", 
+                background=ACCENT_PRIMARY, 
+                foreground=TEXT_PRIMARY, 
+                font=("Segoe UI", 10, "bold"), 
+                borderwidth=0)
+style.map('Primary.TButton', 
+          background=[('active', ACCENT_SECONDARY)])
 
-style.configure('Action.TButton', padding=14, background=ACCENT_GREEN, 
-                foreground="white", font=("Segoe UI", 12, "bold"), borderwidth=0)
-style.map('Action.TButton', background=[('active', '#059669')])
+style.configure('Success.TButton', 
+                padding=16, 
+                background=ACCENT_SUCCESS, 
+                foreground=BG_PRIMARY, 
+                font=("Segoe UI", 12, "bold"), 
+                borderwidth=0)
+style.map('Success.TButton', 
+          background=[('active', '#00e891')])
 
-style.configure("Dark.Horizontal.TProgressbar", background=ACCENT_GREEN, 
-                troughcolor=BG_INPUT, borderwidth=0, thickness=8)
+style.configure('Card.TFrame', 
+                background=BG_CARD, 
+                relief="flat", 
+                borderwidth=1, 
+                focusthickness=0)
 
-# GRADIENT HEADER
-header_frame = tk.Frame(root, bg="#0d9488", height=95)
+style.configure("Horizontal.TProgressbar", 
+                background=PROGRESS_COLOR, 
+                troughcolor=BG_INPUT, 
+                borderwidth=0, 
+                thickness=10)
+
+# Gradient Header
+header_frame = tk.Frame(root, bg=ACCENT_PRIMARY, height=100)
 header_frame.pack(fill=tk.X)
 header_frame.pack_propagate(False)
 
+# Add gradient effect to header
+gradient_frame = tk.Frame(header_frame, bg=BG_PRIMARY, height=100)
+gradient_frame.place(x=0, y=0, relwidth=1, relheight=1)
+
+# Create gradient effect
+for i in range(100):
+    color_value = int(67 + (10 - 67) * (i / 100))  # Gradient from ACCENT_PRIMARY to BG_PRIMARY
+    color = f"#{color_value:02x}{97 + (14 - 97) * (i / 100):02x}{238 + (39 - 238) * (i / 100):02x}"
+    frame = tk.Frame(gradient_frame, bg=color, height=1)
+    frame.place(x=0, y=i, relwidth=1)
+
 # Logo
-logo_container = tk.Frame(header_frame, bg="#0d9488")
-logo_container.place(x=30, y=17)
+logo_container = tk.Frame(header_frame, bg=ACCENT_PRIMARY)
+logo_container.place(x=30, y=20)
 
 try:
     from PIL import Image, ImageTk
     logo_img = Image.open("logo.png")
     logo_img = logo_img.resize((60, 60), Image.Resampling.LANCZOS)
     logo_photo = ImageTk.PhotoImage(logo_img)
-    logo_label = tk.Label(logo_container, image=logo_photo, bg="#0d9488")
+    logo_label = tk.Label(logo_container, image=logo_photo, bg=ACCENT_PRIMARY)
     logo_label.image = logo_photo
     logo_label.pack()
 except:
-    logo_label = tk.Label(logo_container, text="🔷", font=("Segoe UI", 44), bg="#0d9488", fg="white")
+    logo_label = tk.Label(logo_container, text="🔷", font=("Segoe UI", 44), bg=ACCENT_PRIMARY, fg="white")
     logo_label.pack()
 
 # Title
-title_container = tk.Frame(header_frame, bg="#0d9488")
+title_container = tk.Frame(header_frame, bg=ACCENT_PRIMARY)
 title_container.pack(expand=True)
 
 title_label = tk.Label(title_container, text="CUBE DATA PROCESSOR", 
-                       font=("Segoe UI", 26, "bold"), bg="#0d9488", fg="white", 
+                       font=("Segoe UI", 28, "bold"), bg=ACCENT_PRIMARY, fg="white", 
                        pady=12)
 title_label.pack()
 
 subtitle_label = tk.Label(title_container, text="Professional Edition", 
-                         font=("Segoe UI", 9), bg="#0d9488", fg="#d1fae5")
+                         font=("Segoe UI", 10), bg=ACCENT_PRIMARY, fg="#e0e7ff")
 subtitle_label.pack()
 
 # Developer Credit
-credit_frame = tk.Frame(header_frame, bg="#0d9488")
+credit_frame = tk.Frame(header_frame, bg=ACCENT_PRIMARY)
 credit_frame.place(relx=1.0, y=20, anchor="ne", x=-30)
 
 credit_label = tk.Label(credit_frame, text="Developed by", 
-                       font=("Segoe UI", 8), bg="#0d9488", fg="#d1fae5")
+                       font=("Segoe UI", 9), bg=ACCENT_PRIMARY, fg="#e0e7ff")
 credit_label.pack()
 
 dev_name_label = tk.Label(credit_frame, text="SANDEEP", 
-                         font=("Segoe UI", 12, "bold"), bg="#0d9488", fg="white")
+                         font=("Segoe UI", 14, "bold"), bg=ACCENT_PRIMARY, fg="white")
 dev_name_label.pack()
 
 github_label = tk.Label(credit_frame, text="github.com/Sandeep2062", 
-                       font=("Segoe UI", 8), bg="#0d9488", fg="#5eead4", cursor="hand2", 
+                       font=("Segoe UI", 9), bg=ACCENT_PRIMARY, fg="#a5b4fc", cursor="hand2", 
                        underline=True)
 github_label.pack()
 github_label.bind("<Button-1>", lambda e: os.system("start https://github.com/Sandeep2062/Cube-Data-Processor"))
 
 # Main Container with Scrollbar
-main_canvas = tk.Canvas(root, bg=BG_DARK, highlightthickness=0)
-main_scrollbar = tk.Scrollbar(root, orient="vertical", command=main_canvas.yview, bg=BG_CARD, troughcolor=BG_DARK)
-scrollable_frame = tk.Frame(main_canvas, bg=BG_DARK)
+main_canvas = tk.Canvas(root, bg=BG_PRIMARY, highlightthickness=0)
+main_scrollbar = tk.Scrollbar(root, orient="vertical", command=main_canvas.yview, bg=BG_SECONDARY, troughcolor=BG_PRIMARY)
+scrollable_frame = tk.Frame(main_canvas, bg=BG_PRIMARY)
 
 main_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 main_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -493,52 +530,92 @@ def on_mousewheel(event):
 main_canvas.bind_all("<MouseWheel>", on_mousewheel)
 
 # Main container frame (inside scrollable area)
-main_container = tk.Frame(scrollable_frame, bg=BG_DARK)
-main_container.pack(fill=tk.BOTH, expand=True, padx=25, pady=20)
+main_container = tk.Frame(scrollable_frame, bg=BG_PRIMARY)
+main_container.pack(fill=tk.BOTH, expand=True, padx=30, pady=25)
 
 # Processing Mode Selection
 mode_selection_frame = tk.LabelFrame(main_container, text="  ⚙️ PROCESSING MODE  ", 
-                                    font=("Segoe UI", 11, "bold"), bg=BG_CARD, 
+                                    font=("Segoe UI", 12, "bold"), bg=BG_CARD, 
                                     fg=TEXT_PRIMARY, bd=0, relief=tk.FLAT, 
-                                    padx=20, pady=18, highlightbackground=BORDER_COLOR, 
+                                    padx=25, pady=20, highlightbackground=BORDER_COLOR, 
                                     highlightthickness=1)
-mode_selection_frame.pack(fill=tk.X, pady=(0, 10))
+mode_selection_frame.pack(fill=tk.X, pady=(0, 15))
 
-tk.Radiobutton(mode_selection_frame, text="📊 Grade Only", 
-               variable=mode_var, value="grade_only", font=("Segoe UI", 10),
-               bg=BG_CARD, fg=TEXT_PRIMARY, activebackground=BG_CARD, 
-               activeforeground=TEXT_PRIMARY, selectcolor=BG_INPUT,
-               command=update_mode_ui, cursor="hand2").pack(anchor=tk.W, pady=4)
+# Custom Radio Buttons with better styling
+radio_frame = tk.Frame(mode_selection_frame, bg=BG_CARD)
+radio_frame.pack(fill=tk.X, pady=5)
 
-tk.Radiobutton(mode_selection_frame, text="📅 Date Only", 
-               variable=mode_var, value="date_only", font=("Segoe UI", 10),
-               bg=BG_CARD, fg=TEXT_PRIMARY, activebackground=BG_CARD, 
-               activeforeground=TEXT_PRIMARY, selectcolor=BG_INPUT,
-               command=update_mode_ui, cursor="hand2").pack(anchor=tk.W, pady=4)
+def create_radio_button(parent, text, value, row):
+    frame = tk.Frame(parent, bg=BG_CARD)
+    frame.grid(row=row, column=0, sticky="w", pady=8)
+    
+    var = tk.BooleanVar()
+    radio = tk.Radiobutton(frame, text=text, variable=mode_var, value=value, 
+                          font=("Segoe UI", 11), bg=BG_CARD, fg=TEXT_PRIMARY, 
+                          activebackground=BG_CARD, activeforeground=TEXT_PRIMARY, 
+                          selectcolor=BG_INPUT, command=update_mode_ui, cursor="hand2")
+    radio.pack(side=tk.LEFT, padx=5)
+    
+    # Add hover effect
+    def on_enter(e):
+        frame.configure(bg=BG_HOVER)
+        radio.configure(bg=BG_HOVER)
+    
+    def on_leave(e):
+        frame.configure(bg=BG_CARD)
+        radio.configure(bg=BG_CARD)
+    
+    frame.bind("<Enter>", on_enter)
+    frame.bind("<Leave>", on_leave)
+    radio.bind("<Enter>", on_enter)
+    radio.bind("<Leave>", on_leave)
+    
+    return frame
 
-tk.Radiobutton(mode_selection_frame, text="🔄 Both (Grade + Date)", 
-               variable=mode_var, value="both", font=("Segoe UI", 10),
-               bg=BG_CARD, fg=TEXT_PRIMARY, activebackground=BG_CARD, 
-               activeforeground=TEXT_PRIMARY, selectcolor=BG_INPUT,
-               command=update_mode_ui, cursor="hand2").pack(anchor=tk.W, pady=4)
+grade_radio = create_radio_button(radio_frame, "📊 Grade Only", "grade_only", 0)
+date_radio = create_radio_button(radio_frame, "📅 Date Only", "date_only", 1)
+both_radio = create_radio_button(radio_frame, "🔄 Both (Grade + Date)", "both", 2)
 
 # Grade Files Section
 grade_frame = tk.LabelFrame(main_container, text="  📁 GRADE FILES  ", 
-                            font=("Segoe UI", 11, "bold"), bg=BG_CARD, 
+                            font=("Segoe UI", 12, "bold"), bg=BG_CARD, 
                             fg=TEXT_PRIMARY, bd=0, relief=tk.FLAT, 
-                            padx=20, pady=18, highlightbackground=BORDER_COLOR,
+                            padx=25, pady=20, highlightbackground=BORDER_COLOR,
                             highlightthickness=1)
 
 btn_frame = tk.Frame(grade_frame, bg=BG_CARD)
-btn_frame.pack(fill=tk.X, pady=(0, 12))
+btn_frame.pack(fill=tk.X, pady=(0, 15))
 
-ttk.Button(btn_frame, text="➕ Add Files", command=add_grades, style='Dark.TButton').pack(side=tk.LEFT, padx=5)
-ttk.Button(btn_frame, text="🗑️ Clear", command=clear_grades, style='Dark.TButton').pack(side=tk.LEFT, padx=5)
+add_btn = tk.Button(btn_frame, text="➕ Add Files", command=add_grades, 
+                   bg=ACCENT_PRIMARY, fg=TEXT_PRIMARY, font=("Segoe UI", 10, "bold"),
+                   activebackground=ACCENT_SECONDARY, activeforeground=TEXT_PRIMARY,
+                   relief=tk.FLAT, cursor="hand2", padx=15, pady=8, bd=0)
+add_btn.pack(side=tk.LEFT, padx=5)
 
-grade_listbox = tk.Listbox(grade_frame, height=3, font=("Consolas", 9), 
+clear_btn = tk.Button(btn_frame, text="🗑️ Clear", command=clear_grades, 
+                     bg="#e63946", fg=TEXT_PRIMARY, font=("Segoe UI", 10, "bold"),
+                     activebackground="#d62828", activeforeground=TEXT_PRIMARY,
+                     relief=tk.FLAT, cursor="hand2", padx=15, pady=8, bd=0)
+clear_btn.pack(side=tk.LEFT, padx=5)
+
+# Add hover effects to buttons
+def add_hover_effect(button, bg_color, hover_color):
+    def on_enter(e):
+        button.configure(bg=hover_color)
+    
+    def on_leave(e):
+        button.configure(bg=bg_color)
+    
+    button.bind("<Enter>", on_enter)
+    button.bind("<Leave>", on_leave)
+
+add_hover_effect(add_btn, ACCENT_PRIMARY, ACCENT_SECONDARY)
+add_hover_effect(clear_btn, "#e63946", "#d62828")
+
+grade_listbox = tk.Listbox(grade_frame, height=4, font=("Consolas", 10), 
                            bg=BG_INPUT, fg=TEXT_PRIMARY, relief=tk.FLAT, bd=0, 
                            highlightthickness=1, highlightbackground=BORDER_COLOR,
-                           selectbackground=ACCENT_TEAL, selectforeground="white")
+                           selectbackground=ACCENT_PRIMARY, selectforeground="white")
 grade_listbox.pack(fill=tk.BOTH, expand=True)
 
 # Load saved grade files
@@ -549,87 +626,124 @@ for gf in saved_grade_files:
 
 # Calendar File Section
 calendar_frame = tk.LabelFrame(main_container, text="  📅 CALENDAR FILE  ", 
-                              font=("Segoe UI", 11, "bold"), bg=BG_CARD, 
+                              font=("Segoe UI", 12, "bold"), bg=BG_CARD, 
                               fg=TEXT_PRIMARY, bd=0, relief=tk.FLAT, 
-                              padx=20, pady=18, highlightbackground=BORDER_COLOR,
+                              padx=25, pady=20, highlightbackground=BORDER_COLOR,
                               highlightthickness=1)
 
-ttk.Button(calendar_frame, text="📂 Select Calendar", command=pick_calendar, 
-          style='Dark.TButton').pack(anchor=tk.W, pady=(0, 10))
-calendar_entry = tk.Entry(calendar_frame, textvariable=calendar_path, font=("Segoe UI", 9),
+calendar_btn = tk.Button(calendar_frame, text="📂 Select Calendar", command=pick_calendar, 
+                         bg=ACCENT_PRIMARY, fg=TEXT_PRIMARY, font=("Segoe UI", 10, "bold"),
+                         activebackground=ACCENT_SECONDARY, activeforeground=TEXT_PRIMARY,
+                         relief=tk.FLAT, cursor="hand2", padx=15, pady=8, bd=0)
+calendar_btn.pack(anchor=tk.W, pady=(0, 15))
+add_hover_effect(calendar_btn, ACCENT_PRIMARY, ACCENT_SECONDARY)
+
+calendar_entry = tk.Entry(calendar_frame, textvariable=calendar_path, font=("Segoe UI", 10),
                          bg=BG_INPUT, fg=TEXT_PRIMARY, relief=tk.FLAT, bd=0, 
-                         insertbackground="white", highlightthickness=1,
+                         insertbackground=TEXT_PRIMARY, highlightthickness=1,
                          highlightbackground=BORDER_COLOR)
 calendar_entry.pack(fill=tk.X, ipady=12, padx=2)
 
 # Office File Section
 office_frame = tk.LabelFrame(main_container, text="  📄 OFFICE FORMAT FILE  ", 
-                            font=("Segoe UI", 11, "bold"), bg=BG_CARD, 
+                            font=("Segoe UI", 12, "bold"), bg=BG_CARD, 
                             fg=TEXT_PRIMARY, bd=0, relief=tk.FLAT, 
-                            padx=20, pady=18, highlightbackground=BORDER_COLOR,
+                            padx=25, pady=20, highlightbackground=BORDER_COLOR,
                             highlightthickness=1)
-office_frame.pack(fill=tk.X, pady=(0, 10))
+office_frame.pack(fill=tk.X, pady=(0, 15))
 
-ttk.Button(office_frame, text="📂 Select File", command=pick_office, 
-          style='Dark.TButton').pack(anchor=tk.W, pady=(0, 10))
-office_entry = tk.Entry(office_frame, textvariable=office_path, font=("Segoe UI", 9),
+office_btn = tk.Button(office_frame, text="📂 Select File", command=pick_office, 
+                      bg=ACCENT_PRIMARY, fg=TEXT_PRIMARY, font=("Segoe UI", 10, "bold"),
+                      activebackground=ACCENT_SECONDARY, activeforeground=TEXT_PRIMARY,
+                      relief=tk.FLAT, cursor="hand2", padx=15, pady=8, bd=0)
+office_btn.pack(anchor=tk.W, pady=(0, 15))
+add_hover_effect(office_btn, ACCENT_PRIMARY, ACCENT_SECONDARY)
+
+office_entry = tk.Entry(office_frame, textvariable=office_path, font=("Segoe UI", 10),
                        bg=BG_INPUT, fg=TEXT_PRIMARY, relief=tk.FLAT, bd=0, 
-                       insertbackground="white", highlightthickness=1,
+                       insertbackground=TEXT_PRIMARY, highlightthickness=1,
                        highlightbackground=BORDER_COLOR)
 office_entry.pack(fill=tk.X, ipady=12, padx=2)
 
 # Output Folder Section
 output_frame = tk.LabelFrame(main_container, text="  💾 OUTPUT FOLDER  ", 
-                            font=("Segoe UI", 11, "bold"), bg=BG_CARD, 
+                            font=("Segoe UI", 12, "bold"), bg=BG_CARD, 
                             fg=TEXT_PRIMARY, bd=0, relief=tk.FLAT, 
-                            padx=20, pady=18, highlightbackground=BORDER_COLOR,
+                            padx=25, pady=20, highlightbackground=BORDER_COLOR,
                             highlightthickness=1)
-output_frame.pack(fill=tk.X, pady=(0, 10))
+output_frame.pack(fill=tk.X, pady=(0, 15))
 
-ttk.Button(output_frame, text="📂 Select Folder", command=pick_output_folder, 
-          style='Dark.TButton').pack(anchor=tk.W, pady=(0, 10))
-output_entry = tk.Entry(output_frame, textvariable=output_path, font=("Segoe UI", 9),
+output_btn = tk.Button(output_frame, text="📂 Select Folder", command=pick_output_folder, 
+                      bg=ACCENT_PRIMARY, fg=TEXT_PRIMARY, font=("Segoe UI", 10, "bold"),
+                      activebackground=ACCENT_SECONDARY, activeforeground=TEXT_PRIMARY,
+                      relief=tk.FLAT, cursor="hand2", padx=15, pady=8, bd=0)
+output_btn.pack(anchor=tk.W, pady=(0, 15))
+add_hover_effect(output_btn, ACCENT_PRIMARY, ACCENT_SECONDARY)
+
+output_entry = tk.Entry(output_frame, textvariable=output_path, font=("Segoe UI", 10),
                        bg=BG_INPUT, fg=TEXT_PRIMARY, relief=tk.FLAT, bd=0, 
-                       insertbackground="white", highlightthickness=1,
+                       insertbackground=TEXT_PRIMARY, highlightthickness=1,
                        highlightbackground=BORDER_COLOR)
 output_entry.pack(fill=tk.X, ipady=12, padx=2)
 
-# Start Button - Fixed with proper height
-start_btn = tk.Button(main_container, text="▶️  START PROCESSING", command=run_processing,
-                     font=("Segoe UI", 13, "bold"), bg=ACCENT_GREEN, fg="white",
-                     activebackground="#059669", relief=tk.FLAT, cursor="hand2",
-                     padx=40, pady=18, borderwidth=0, height=2)
-start_btn.pack(pady=(20, 18))
+# Start Button with enhanced styling
+start_btn_frame = tk.Frame(main_container, bg=BG_PRIMARY)
+start_btn_frame.pack(pady=(25, 20))
+
+# Add glow effect behind button
+glow_frame = tk.Frame(start_btn_frame, bg=BG_PRIMARY, highlightbackground=ACCENT_SUCCESS, highlightthickness=2)
+glow_frame.pack(padx=10, pady=10)
+
+start_btn = tk.Button(glow_frame, text="▶️  START PROCESSING", command=run_processing,
+                     font=("Segoe UI", 14, "bold"), bg=ACCENT_SUCCESS, fg=BG_PRIMARY,
+                     activebackground="#00e891", relief=tk.FLAT, cursor="hand2",
+                     padx=40, pady=18, bd=0)
+start_btn.pack()
+
+def start_btn_on_enter(e):
+    start_btn.configure(bg="#00e891")
+    glow_frame.configure(highlightbackground="#00e891")
+
+def start_btn_on_leave(e):
+    start_btn.configure(bg=ACCENT_SUCCESS)
+    glow_frame.configure(highlightbackground=ACCENT_SUCCESS)
+
+start_btn.bind("<Enter>", start_btn_on_enter)
+start_btn.bind("<Leave>", start_btn_on_leave)
 
 # Progress Bar
-progress_frame = tk.Frame(main_container, bg=BG_DARK)
-progress_frame.pack(fill=tk.X, pady=(0, 12))
+progress_frame = tk.Frame(main_container, bg=BG_PRIMARY)
+progress_frame.pack(fill=tk.X, pady=(0, 15))
 
 progress = ttk.Progressbar(progress_frame, length=700, mode="determinate", 
-                          style="Dark.Horizontal.TProgressbar")
+                          style="Horizontal.TProgressbar")
 progress.pack()
 
 # Log Section
 log_frame = tk.LabelFrame(main_container, text="  📋 PROCESSING LOG  ", 
-                         font=("Segoe UI", 11, "bold"), bg=BG_CARD, 
+                         font=("Segoe UI", 12, "bold"), bg=BG_CARD, 
                          fg=TEXT_PRIMARY, bd=0, relief=tk.FLAT, 
-                         padx=20, pady=18, highlightbackground=BORDER_COLOR,
+                         padx=25, pady=20, highlightbackground=BORDER_COLOR,
                          highlightthickness=1)
 log_frame.pack(fill=tk.BOTH, expand=True)
 
 log_scrollbar = tk.Scrollbar(log_frame, bg=BG_INPUT)
 log_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-log_box = tk.Text(log_frame, height=10, font=("Consolas", 9), bg=BG_INPUT, 
-                 fg="#6ee7b7", relief=tk.FLAT, bd=0, wrap=tk.WORD, 
-                 yscrollcommand=log_scrollbar.set, insertbackground="white")
+log_box = tk.Text(log_frame, height=10, font=("Consolas", 10), bg=BG_INPUT, 
+                 fg=ACCENT_SUCCESS, relief=tk.FLAT, bd=0, wrap=tk.WORD, 
+                 yscrollcommand=log_scrollbar.set, insertbackground=TEXT_PRIMARY)
 log_box.pack(fill=tk.BOTH, expand=True)
 log_scrollbar.config(command=log_box.yview)
 
 # Footer
-footer = tk.Label(root, text="© 2026 Sandeep | github.com/Sandeep2062/Cube-Data-Processor", 
-                 font=("Segoe UI", 8), bg=BG_DARK, fg=TEXT_SECONDARY)
-footer.pack(pady=10)
+footer = tk.Frame(root, bg=BG_SECONDARY, height=40)
+footer.pack(fill=tk.X, side=tk.BOTTOM)
+footer.pack_propagate(False)
+
+footer_label = tk.Label(footer, text="© 2026 Sandeep | github.com/Sandeep2062/Cube-Data-Processor", 
+                       font=("Segoe UI", 9), bg=BG_SECONDARY, fg=TEXT_SECONDARY)
+footer_label.pack(expand=True)
 
 # Initialize UI
 update_mode_ui()

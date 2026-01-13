@@ -1,9 +1,9 @@
-name: Build and Release Windows EXE
+name: Build and Release
 
 on:
   push:
     tags:
-      - 'v*' 
+      - 'v*'
 
 jobs:
   build:
@@ -24,10 +24,10 @@ jobs:
         run: |
           pip install pyinstaller openpyxl customtkinter Pillow
 
-      - name: Build EXE with PyInstaller
+      - name: Build EXE
         run: |
           pyinstaller --onefile --noconsole `
-          --name "Cube-Data-Processor-${{ github.ref_name }}" `
+          --name "Cube-Data-Processor" `
           --icon="icon.ico" `
           --add-data "logo.png;." `
           --add-data "icon.ico;." `
@@ -36,18 +36,20 @@ jobs:
           --hidden-import=PIL `
           Cube.py
 
-      - name: Create GitHub Release
+      - name: Get commit message
+        id: get_commit
+        run: |
+          $commitMsg = git log -1 --pretty=%B
+          echo "commit_message=$commitMsg" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*.exe
           tag_name: ${{ github.ref_name }}
-          # This line below sets the title you wanted
-          name: "Automated Build for Cube Data Processor ${{ github.ref_name }}"
-          body: |
-            ### 🚀 New Release: ${{ github.ref_name }}
-            - Modern UI with CustomTkinter
-            - Registry-based settings (Windows)
-            - Automated Excel data processing
+          name: ${{ github.ref_name }}
+          body: ${{ steps.get_commit.outputs.commit_message }}
           draft: false
           prerelease: false
         env:

@@ -1,31 +1,83 @@
 import openpyxl
 from openpyxl.drawing.image import Image as XLImage
-from openpyxl.utils import get_column_letter
 import tkinter as tk
 from tkinter import filedialog, ttk, messagebox
 import os
 import winsound
 from copy import deepcopy
 import shutil
+import json
 
 """
 ╔══════════════════════════════════════════════════════════════════╗
-║                    CUBE DATA PROCESSOR v5                       ║
+║                    CUBE DATA PROCESSOR                            ║
 ║                                                                   ║
 ║  Developer: Sandeep (https://github.com/Sandeep2062)            ║
-║  Repository: https://github.com/Sandeep2062/Cube-Merge          ║
-║  Description: Excel data processor                                ║
+║  Repository: https://github.com/Sandeep2062/Cube-Data-Processor ║
 ║                                                                   ║
-║  © 2025 Sandeep - All Rights Reserved                           ║
+║  © 2026 Sandeep - All Rights Reserved                           ║
 ╚══════════════════════════════════════════════════════════════════╝
 """
 
-# Detect grade from filename
+# Settings file location (same folder as EXE)
+def get_settings_path():
+    """Get settings file path in same folder as script/EXE"""
+    if getattr(sys, 'frozen', False):
+        # Running as EXE
+        base_path = os.path.dirname(sys.executable)
+    else:
+        # Running as script
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    
+    return os.path.join(base_path, "cube_settings.json")
+
+SETTINGS_FILE = get_settings_path()
+
+# Load saved settings
+def load_settings():
+    try:
+        if os.path.exists(SETTINGS_FILE):
+            with open(SETTINGS_FILE, 'r') as f:
+                settings = json.load(f)
+                # Convert grade_files list to filenames only
+                if "grade_files" in settings:
+                    grade_files_data = settings["grade_files"]
+                else:
+                    grade_files_data = []
+                return settings, grade_files_data
+    except:
+        pass
+    return {"output_path": "", "calendar_path": ""}, []
+
+# Save settings (remembers grade files and paths except office)
+def save_settings(grade_file_list, output, calendar):
+    try:
+        settings = {
+            "grade_files": grade_file_list,  # Save full paths
+            "output_path": output,
+            "calendar_path": calendar
+        }
+        with open(SETTINGS_FILE, 'w') as f:
+            json.dump(settings, f, indent=2)
+    except Exception as e:
+        print(f"Could not save settings: {e}")
+
+# Smart grade extraction - handles M20, M15, and Mortar_1_4 format
 def extract_grade(filename):
     name = os.path.basename(filename).split('.')[0].upper()
-    name = name.replace("_", ":").replace("-", ":")
+    
+    # Check if it's mortar format (contains underscore followed by numbers)
+    # E.g., MORTAR_1_4 → 1:4
+    if "MORTAR" in name and "_" in name:
+        parts = name.split("_")
+        # Get the ratio part after MORTAR_
+        if len(parts) >= 3:  # MORTAR_1_4
+            ratio = f"{parts[-2]}:{parts[-1]}"
+            return ratio
+    
+    # For regular grades (M20, M15, etc.) - just clean up
+    name = name.replace("_", "").replace("-", "")
     return name.strip()
-
 
 # FILLED ROW CHECKER
 def get_last_row(ws):
@@ -35,237 +87,214 @@ def get_last_row(ws):
             return row - 1
         row += 1
 
-
-# SAFE WORKBOOK LOADING - Preserves images and prevents corruption
+# SAFE WORKBOOK LOADING
 def load_workbook_safe(filepath):
-    """Load workbook while preserving images and avoiding corruption"""
     try:
-        # Try with keep_vba first
         wb = openpyxl.load_workbook(filepath, keep_vba=False, data_only=False, keep_links=False)
         return wb
     except:
-        # Fallback to basic load
         wb = openpyxl.load_workbook(filepath)
         return wb
 
-
-# COPY IMAGES BETWEEN SHEETS - Fixed version
-def copy_all_images_from_template(template_file, output_file):
-    """
-    Copy all images from template to output file after saving data.
-    This ensures logos are preserved without corruption.
-    """
+# LOAD CALENDAR DATA
+def load_calendar_data(calendar_file, log):
+    """Load calendar dates from Excel file"""
     try:
-        # Load both files
-        template_wb = openpyxl.load_workbook(template_file)
-        output_wb = openpyxl.load_workbook(output_file)
+        if not calendar_file or not os.path.exists(calendar_file):
+            log("⚠ No calendar file selected")
+            return None
         
-        # Copy images from each sheet
-        for sheet_name in template_wb.sheetnames:
-            if sheet_name in output_wb.sheetnames:
-                source_sheet = template_wb[sheet_name]
-                target_sheet = output_wb[sheet_name]
-                
-                # Copy images if they exist
-                if hasattr(source_sheet, '_images') and source_sheet._images:
-                    # Clear existing images in target
-                    target_sheet._images = []
-                    
-                    # Copy each image
-                    for img in source_sheet._images:
-                        new_img = XLImage(img.ref)
-                        new_img.anchor = deepcopy(img.anchor)
-                        target_sheet.add_image(new_img)
+        wb = load_workbook_safe(calendar_file)
+        ws = wb.active
         
-        # Save with images
-        output_wb.save(output_file)
-        template_wb.close()
-        output_wb.close()
-        return True
-    except Exception as e:
-        print(f"Image copy warning: {e}")
-        return False
-
-
-# MAIN PROCESSING - SEPARATE MODE
-def process_grade_separate(grade_file, office_file, output_folder, log):
-    temp_file = None
-    try:
-        grade_wb = load_workbook_safe(grade_file)
-        grade_ws = grade_wb.active
-
-        grade_name = extract_grade(grade_file)
-        log(f"\n=== Processing {grade_file}")
-        log(f"Detected Grade: {grade_name}")
-
-        # Create a temporary copy of the office file to preserve images
-        base = os.path.basename(office_file).split(".")[0]
-        outname = f"{base}_{grade_name}_Processed.xlsx"
-        outpath = os.path.join(output_folder, outname)
+        calendar_dict = {}
+        row = 2  # Start from row 2
         
-        # Copy the template file first (preserves everything)
-        shutil.copy2(office_file, outpath)
-        
-        # Now load and modify the copy
-        office_wb = load_workbook_safe(outpath)
-
-        last_row = get_last_row(grade_ws)
-        log(f"Total data rows: {last_row - 1}")
-
-        # Get all sheets that match this grade
-        matching_sheets = []
-        for sheet_name in office_wb.sheetnames:
-            ws = office_wb[sheet_name]
-            b12_value = ws["B12"].value
-            if b12_value:
-                b12 = str(b12_value).replace(" ", "").upper()
-                if b12 == grade_name:
-                    matching_sheets.append(sheet_name)
-        
-        log(f"Found {len(matching_sheets)} sheets matching grade '{grade_name}'")
-        
-        if len(matching_sheets) == 0:
-            log(f"⚠ WARNING: No sheets found with '{grade_name}' in cell B12!")
-            office_wb.close()
-            os.remove(outpath)
-            return 0
-
-        copy_count = 0
-        sheet_index = 0
-
-        # Loop through each data row
-        for r in range(2, last_row + 1):
-            if sheet_index >= len(matching_sheets):
-                log(f"⚠ Warning: More data rows than matching sheets. Stopping at row {r}")
+        while True:
+            casting_date = ws.cell(row=row, column=1).value  # Column A
+            if not casting_date:
                 break
-
-            current_sheet_name = matching_sheets[sheet_index]
-            ws = office_wb[current_sheet_name]
             
-            # Read weight and strength values
-            weight_values = [grade_ws.cell(row=r, column=c).value for c in range(2, 8)]
-            strength_values = [grade_ws.cell(row=r, column=c).value for c in range(9, 15)]
-
-            # Write values (ONLY modify data cells, logos remain untouched)
-            for i, v in enumerate(weight_values):
-                ws.cell(row=25, column=3 + i, value=v)
-            for i, v in enumerate(strength_values):
-                ws.cell(row=27, column=3 + i, value=v)
-
-            copy_count += 1
-            log(f"✓ Row {r} → Sheet: {current_sheet_name}")
-            sheet_index += 1
-
-        # Save (logos already preserved from copy)
-        office_wb.save(outpath)
-        office_wb.close()
-        grade_wb.close()
+            date_7 = ws.cell(row=row, column=2).value   # Column B (7 days)
+            date_28 = ws.cell(row=row, column=3).value  # Column C (28 days)
+            
+            # Store as string for matching
+            if casting_date:
+                date_str = str(casting_date).strip()
+                calendar_dict[date_str] = {
+                    "7_days": str(date_7).strip() if date_7 else "",
+                    "28_days": str(date_28).strip() if date_28 else ""
+                }
+            
+            row += 1
         
-        log(f"✓ Saved → {outpath} (Logos preserved ✓)")
-
-        return copy_count
-
+        wb.close()
+        log(f"✓ Calendar loaded: {len(calendar_dict)} dates")
+        return calendar_dict
+        
     except Exception as e:
-        log(f"✖ ERROR: {e}")
-        if temp_file and os.path.exists(temp_file):
-            try:
-                os.remove(temp_file)
-            except:
-                pass
-        return 0
+        log(f"✖ Calendar load error: {e}")
+        return None
 
-
-# MAIN PROCESSING - COMBINE MODE
-def process_all_grades_combined(grade_files, office_file, output_folder, log):
+# PROCESS WITH GRADE AND/OR DATE
+def process_combined(grade_files, office_file, output_folder, calendar_file, mode, log):
     try:
-        log(f"\n=== COMBINE MODE: Processing all grades into one file ===")
+        log(f"\n{'='*60}")
+        log(f"PROCESSING MODE: {mode.upper().replace('_', ' ')}")
+        log(f"{'='*60}")
         
-        # Create output file by copying template first
+        # Load calendar if date mode
+        calendar_data = None
+        if mode in ["date_only", "both"]:
+            calendar_data = load_calendar_data(calendar_file, log)
+            if not calendar_data:
+                log("✖ Cannot proceed without calendar file")
+                return 0
+        
+        # Create output filename (NO TIMESTAMP)
         base = os.path.basename(office_file).split(".")[0]
-        outname = f"{base}_ALL_GRADES_Combined.xlsx"
+        outname = f"{base}_Processed.xlsx"
         outpath = os.path.join(output_folder, outname)
         
         # Copy template to preserve images
         shutil.copy2(office_file, outpath)
         
-        # Now load and modify the copy
+        # Load and modify the copy
         office_wb = load_workbook_safe(outpath)
         
         total_copy_count = 0
         
-        # Process each grade file
-        for grade_file in grade_files:
-            grade_wb = load_workbook_safe(grade_file)
-            grade_ws = grade_wb.active
-            grade_name = extract_grade(grade_file)
+        # GRADE PROCESSING
+        if mode in ["grade_only", "both"] and grade_files:
+            log(f"\n--- GRADE PROCESSING ---")
             
-            log(f"\n--- Processing Grade: {grade_name} ---")
+            for grade_file in grade_files:
+                grade_wb = load_workbook_safe(grade_file)
+                grade_ws = grade_wb.active
+                grade_name = extract_grade(grade_file)
+                
+                log(f"\nProcessing: {os.path.basename(grade_file)}")
+                log(f"Looking for grade: {grade_name}")
+                
+                last_row = get_last_row(grade_ws)
+                log(f"Data rows: {last_row - 1}")
+                
+                # Find matching sheets - normalize both sides for comparison
+                matching_sheets = []
+                for sheet_name in office_wb.sheetnames:
+                    ws = office_wb[sheet_name]
+                    b12_value = ws["B12"].value
+                    if b12_value:
+                        # Normalize B12 value
+                        b12 = str(b12_value).replace(" ", "").upper()
+                        
+                        # For comparison, also normalize grade_name
+                        grade_normalized = grade_name.replace(" ", "").upper()
+                        
+                        if b12 == grade_normalized:
+                            matching_sheets.append(sheet_name)
+                            log(f"  ✓ Matched sheet: {sheet_name} (B12={b12})")
+                
+                log(f"Total matching sheets: {len(matching_sheets)}")
+                
+                if len(matching_sheets) == 0:
+                    log(f"⚠ No sheets found with B12='{grade_name}'")
+                    grade_wb.close()
+                    continue
+                
+                sheet_index = 0
+                
+                # Copy grade data
+                for r in range(2, last_row + 1):
+                    if sheet_index >= len(matching_sheets):
+                        log(f"⚠ More data rows than available sheets")
+                        break
+                    
+                    current_sheet_name = matching_sheets[sheet_index]
+                    ws = office_wb[current_sheet_name]
+                    
+                    weight_values = [grade_ws.cell(row=r, column=c).value for c in range(2, 8)]
+                    strength_values = [grade_ws.cell(row=r, column=c).value for c in range(9, 15)]
+                    
+                    for i, v in enumerate(weight_values):
+                        ws.cell(row=25, column=3 + i, value=v)
+                    for i, v in enumerate(strength_values):
+                        ws.cell(row=27, column=3 + i, value=v)
+                    
+                    total_copy_count += 1
+                    log(f"  ✓ Row {r} → {current_sheet_name}")
+                    sheet_index += 1
+                
+                grade_wb.close()
+        
+        # DATE PROCESSING
+        if mode in ["date_only", "both"] and calendar_data:
+            log(f"\n--- DATE PROCESSING ---")
             
-            last_row = get_last_row(grade_ws)
-            log(f"Data rows: {last_row - 1}")
+            updated_count = 0
             
-            # Find matching sheets for this grade
-            matching_sheets = []
             for sheet_name in office_wb.sheetnames:
                 ws = office_wb[sheet_name]
-                b12_value = ws["B12"].value
-                if b12_value:
-                    b12 = str(b12_value).replace(" ", "").upper()
-                    if b12 == grade_name:
-                        matching_sheets.append(sheet_name)
-            
-            log(f"Found {len(matching_sheets)} sheets for '{grade_name}'")
-            
-            if len(matching_sheets) == 0:
-                log(f"⚠ No sheets found for '{grade_name}'")
-                grade_wb.close()
-                continue
-            
-            sheet_index = 0
-            
-            # Copy data for this grade (logos stay intact)
-            for r in range(2, last_row + 1):
-                if sheet_index >= len(matching_sheets):
-                    log(f"⚠ More rows than sheets for {grade_name}")
-                    break
                 
-                current_sheet_name = matching_sheets[sheet_index]
-                ws = office_wb[current_sheet_name]
+                # Read casting date from C17
+                casting_date_cell = ws["C17"].value
+                if not casting_date_cell:
+                    continue
                 
-                weight_values = [grade_ws.cell(row=r, column=c).value for c in range(2, 8)]
-                strength_values = [grade_ws.cell(row=r, column=c).value for c in range(9, 15)]
+                casting_date = str(casting_date_cell).strip()
                 
-                for i, v in enumerate(weight_values):
-                    ws.cell(row=25, column=3 + i, value=v)
-                for i, v in enumerate(strength_values):
-                    ws.cell(row=27, column=3 + i, value=v)
-                
-                total_copy_count += 1
-                log(f"✓ {grade_name} Row {r} → {current_sheet_name}")
-                sheet_index += 1
+                # Look up in calendar
+                if casting_date in calendar_data:
+                    date_7 = calendar_data[casting_date]["7_days"]
+                    date_28 = calendar_data[casting_date]["28_days"]
+                    
+                    # Write 7-day date to C18
+                    if date_7:
+                        ws["C18"] = date_7
+                    
+                    # Write 28-day date to F18
+                    if date_28:
+                        ws["F18"] = date_28
+                    
+                    updated_count += 1
+                    log(f"✓ {sheet_name}: {casting_date} → 7d:{date_7}, 28d:{date_28}")
+                else:
+                    log(f"⚠ Date not in calendar: {casting_date} ({sheet_name})")
             
-            grade_wb.close()
+            log(f"\nSheets updated: {updated_count}")
         
-        # Save combined file (logos already preserved)
+        # Save combined file
         office_wb.save(outpath)
         office_wb.close()
         
-        log(f"\n✓✓✓ COMBINED FILE SAVED → {outpath} (Logos preserved ✓)")
+        log(f"\n{'='*60}")
+        log(f"✓✓✓ SAVED: {outpath}")
+        log(f"{'='*60}")
         
         return total_copy_count
         
     except Exception as e:
         log(f"✖ ERROR: {e}")
+        import traceback
+        log(traceback.format_exc())
         return 0
-
 
 # ------------- GUI LOGIC -------------
 
 def run_processing():
-    if not grade_files:
-        messagebox.showerror("Error", "Please select grade files.")
-        return
-
+    # Validate inputs based on mode
+    mode = mode_var.get()
+    
+    if mode in ["grade_only", "both"]:
+        if not grade_files:
+            messagebox.showerror("Error", "Please select grade files for grade processing.")
+            return
+    
+    if mode in ["date_only", "both"]:
+        if not calendar_path.get():
+            messagebox.showerror("Error", "Please select calendar file for date processing.")
+            return
+    
     if not office_path.get():
         messagebox.showerror("Error", "Select office format file.")
         return
@@ -274,37 +303,27 @@ def run_processing():
         messagebox.showerror("Error", "Select output folder.")
         return
 
+    # Save settings (grade files, output path, calendar - NOT office)
+    save_settings(grade_files, output_path.get(), calendar_path.get())
+
     log_box.delete("1.0", "end")
-    total = 0
-
-    if mode_var.get() == 2:  # COMBINE MODE
-        progress["value"] = 50
-        root.update_idletasks()
-        
-        total = process_all_grades_combined(
-            grade_files,
-            office_path.get(),
-            output_path.get(),
-            log=lambda m: log_box.insert(tk.END, m + "\n")
-        )
-        
-        progress["value"] = 100
-        
-    else:  # SEPARATE MODE
-        for i, file in enumerate(grade_files):
-            progress["value"] = (i + 1) / len(grade_files) * 100
-            root.update_idletasks()
-
-            total += process_grade_separate(
-                file,
-                office_path.get(),
-                output_path.get(),
-                log=lambda m: log_box.insert(tk.END, m + "\n")
-            )
-
+    
+    progress["value"] = 50
+    root.update_idletasks()
+    
+    total = process_combined(
+        grade_files,
+        office_path.get(),
+        output_path.get(),
+        calendar_path.get(),
+        mode,
+        log=lambda m: log_box.insert(tk.END, m + "\n")
+    )
+    
+    progress["value"] = 100
+    
     winsound.MessageBeep()
-    messagebox.showinfo("✓ Completed", f"Processing Complete!\n\nTotal Rows Copied: {total}")
-
+    messagebox.showinfo("✓ Completed", f"Processing Complete!\n\nTotal Operations: {total}")
 
 def add_grades():
     files = filedialog.askopenfilenames(filetypes=[("Excel Files", "*.xlsx")])
@@ -313,207 +332,280 @@ def add_grades():
             grade_files.append(f)
             grade_listbox.insert(tk.END, os.path.basename(f))
 
-
 def clear_grades():
     grade_files.clear()
     grade_listbox.delete(0, tk.END)
-
 
 def pick_office():
     path = filedialog.askopenfilename(filetypes=[("Excel Files", "*.xlsx")])
     if path:
         office_path.set(path)
 
+def pick_calendar():
+    path = filedialog.askopenfilename(filetypes=[("Excel Files", "*.xlsx")])
+    if path:
+        calendar_path.set(path)
 
 def pick_output_folder():
     folder = filedialog.askdirectory()
     if folder:
         output_path.set(folder)
 
+def update_mode_ui():
+    """Show/hide sections based on mode"""
+    mode = mode_var.get()
+    
+    if mode == "grade_only":
+        grade_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10), before=office_frame)
+        calendar_frame.pack_forget()
+    elif mode == "date_only":
+        grade_frame.pack_forget()
+        calendar_frame.pack(fill=tk.X, pady=(0, 10), before=office_frame)
+    else:  # both
+        grade_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10), before=office_frame)
+        calendar_frame.pack(fill=tk.X, pady=(0, 10), before=office_frame)
 
-# ------------------- DARK MODE PREMIUM UI -------------------
+# ------------------- ENHANCED DARK UI V6 -------------------
 
 root = tk.Tk()
-root.title("Cube Data Processor v3.1 - Dark Edition")
-root.geometry("920x820")
-root.configure(bg="#1a1a1a")
+root.title("Cube Data Processor")
+root.geometry("950x870")
+root.configure(bg="#0f0f0f")
 
-# Try to set window icon
 try:
     root.iconbitmap("icon.ico")
 except:
     pass
 
+# Load saved settings
+import sys
+settings, saved_grade_files = load_settings()
+
 grade_files = []
 office_path = tk.StringVar()
-output_path = tk.StringVar()
-mode_var = tk.IntVar(value=1)
+output_path = tk.StringVar(value=settings.get("output_path", ""))
+calendar_path = tk.StringVar(value=settings.get("calendar_path", ""))
+mode_var = tk.StringVar(value="both")
 
-# Dark Theme Colors
-BG_DARK = "#1a1a1a"
-BG_CARD = "#252525"
-BG_INPUT = "#2d2d2d"
+# Enhanced Dark Colors
+BG_DARK = "#0f0f0f"
+BG_CARD = "#1a1a1a"
+BG_CARD_HOVER = "#252525"
+BG_INPUT = "#242424"
 TEXT_PRIMARY = "#ffffff"
-TEXT_SECONDARY = "#b0b0b0"
-ACCENT_BLUE = "#0d7377"
-ACCENT_GREEN = "#14a76c"
-BORDER_COLOR = "#3a3a3a"
+TEXT_SECONDARY = "#a0a0a0"
+ACCENT_TEAL = "#0d9488"
+ACCENT_GREEN = "#10b981"
+BORDER_COLOR = "#2a2a2a"
+HOVER_COLOR = "#1e3a3a"
 
-# Enhanced Style for Dark Mode
+# Styles
 style = ttk.Style()
 style.theme_use('clam')
-style.configure('Dark.TButton', padding=8, relief="flat", background=ACCENT_BLUE, 
-                foreground="white", font=("Segoe UI", 9), borderwidth=0)
-style.map('Dark.TButton', background=[('active', '#0a5d5f')])
 
-style.configure('Action.TButton', padding=12, background=ACCENT_GREEN, 
-                foreground="white", font=("Segoe UI", 11, "bold"), borderwidth=0)
-style.map('Action.TButton', background=[('active', '#0f8655')])
+style.configure('Dark.TButton', padding=9, relief="flat", background=ACCENT_TEAL, 
+                foreground="white", font=("Segoe UI", 9), borderwidth=0)
+style.map('Dark.TButton', background=[('active', '#0a6b62')])
+
+style.configure('Action.TButton', padding=14, background=ACCENT_GREEN, 
+                foreground="white", font=("Segoe UI", 12, "bold"), borderwidth=0)
+style.map('Action.TButton', background=[('active', '#059669')])
 
 style.configure("Dark.Horizontal.TProgressbar", background=ACCENT_GREEN, 
-                troughcolor=BG_INPUT, borderwidth=0, lightcolor=ACCENT_GREEN, darkcolor=ACCENT_GREEN)
+                troughcolor=BG_INPUT, borderwidth=0, thickness=8)
 
 # GRADIENT HEADER
-header_frame = tk.Frame(root, bg="#0d7377", height=100)
+header_frame = tk.Frame(root, bg="#0d9488", height=95)
 header_frame.pack(fill=tk.X)
 header_frame.pack_propagate(False)
 
-# Logo Space (LEFT)
-logo_container = tk.Frame(header_frame, bg="#0d7377")
-logo_container.place(x=25, y=20)
+# Logo
+logo_container = tk.Frame(header_frame, bg="#0d9488")
+logo_container.place(x=30, y=17)
 
 try:
     from PIL import Image, ImageTk
     logo_img = Image.open("logo.png")
     logo_img = logo_img.resize((60, 60), Image.Resampling.LANCZOS)
     logo_photo = ImageTk.PhotoImage(logo_img)
-    logo_label = tk.Label(logo_container, image=logo_photo, bg="#0d7377")
+    logo_label = tk.Label(logo_container, image=logo_photo, bg="#0d9488")
     logo_label.image = logo_photo
     logo_label.pack()
 except:
-    logo_label = tk.Label(logo_container, text="🔷", font=("Segoe UI", 42), bg="#0d7377", fg="white")
+    logo_label = tk.Label(logo_container, text="🔷", font=("Segoe UI", 44), bg="#0d9488", fg="white")
     logo_label.pack()
 
-# Title (CENTER)
-title_container = tk.Frame(header_frame, bg="#0d7377")
+# Title
+title_container = tk.Frame(header_frame, bg="#0d9488")
 title_container.pack(expand=True)
 
 title_label = tk.Label(title_container, text="CUBE DATA PROCESSOR", 
-                       font=("Segoe UI", 24, "bold"), bg="#0d7377", fg="white")
+                       font=("Segoe UI", 26, "bold"), bg="#0d9488", fg="white", 
+                       pady=12)
 title_label.pack()
 
-version_label = tk.Label(title_container, text="v3.1 - Dark Edition | Logo Preservation Technology", 
-                        font=("Segoe UI", 9), bg="#0d7377", fg="#a8e6cf")
-version_label.pack()
+subtitle_label = tk.Label(title_container, text="Professional Edition", 
+                         font=("Segoe UI", 9), bg="#0d9488", fg="#d1fae5")
+subtitle_label.pack()
 
-# Developer Credit (RIGHT)
-credit_frame = tk.Frame(header_frame, bg="#0d7377")
-credit_frame.place(relx=1.0, y=20, anchor="ne", x=-25)
+# Developer Credit
+credit_frame = tk.Frame(header_frame, bg="#0d9488")
+credit_frame.place(relx=1.0, y=20, anchor="ne", x=-30)
 
 credit_label = tk.Label(credit_frame, text="Developed by", 
-                       font=("Segoe UI", 8), bg="#0d7377", fg="#b0b0b0")
+                       font=("Segoe UI", 8), bg="#0d9488", fg="#d1fae5")
 credit_label.pack()
 
 dev_name_label = tk.Label(credit_frame, text="SANDEEP", 
-                         font=("Segoe UI", 11, "bold"), bg="#0d7377", fg="white")
+                         font=("Segoe UI", 12, "bold"), bg="#0d9488", fg="white")
 dev_name_label.pack()
 
 github_label = tk.Label(credit_frame, text="github.com/Sandeep2062", 
-                       font=("Segoe UI", 8), bg="#0d7377", fg="#4dd0e1", cursor="hand2")
+                       font=("Segoe UI", 8), bg="#0d9488", fg="#5eead4", cursor="hand2", 
+                       underline=True)
 github_label.pack()
-github_label.bind("<Button-1>", lambda e: os.system("start https://github.com/Sandeep2062/Cube-Merge"))
+github_label.bind("<Button-1>", lambda e: os.system("start https://github.com/Sandeep2062/Cube-Data-Processor"))
 
 # Main Container
 main_container = tk.Frame(root, bg=BG_DARK)
-main_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+main_container.pack(fill=tk.BOTH, expand=True, padx=25, pady=20)
+
+# Processing Mode Selection
+mode_selection_frame = tk.LabelFrame(main_container, text="  ⚙️ PROCESSING MODE  ", 
+                                    font=("Segoe UI", 11, "bold"), bg=BG_CARD, 
+                                    fg=TEXT_PRIMARY, bd=0, relief=tk.FLAT, 
+                                    padx=20, pady=18, highlightbackground=BORDER_COLOR, 
+                                    highlightthickness=1)
+mode_selection_frame.pack(fill=tk.X, pady=(0, 10))
+
+tk.Radiobutton(mode_selection_frame, text="📊 Grade Only", 
+               variable=mode_var, value="grade_only", font=("Segoe UI", 10),
+               bg=BG_CARD, fg=TEXT_PRIMARY, activebackground=BG_CARD, 
+               activeforeground=TEXT_PRIMARY, selectcolor=BG_INPUT,
+               command=update_mode_ui, cursor="hand2").pack(anchor=tk.W, pady=4)
+
+tk.Radiobutton(mode_selection_frame, text="📅 Date Only", 
+               variable=mode_var, value="date_only", font=("Segoe UI", 10),
+               bg=BG_CARD, fg=TEXT_PRIMARY, activebackground=BG_CARD, 
+               activeforeground=TEXT_PRIMARY, selectcolor=BG_INPUT,
+               command=update_mode_ui, cursor="hand2").pack(anchor=tk.W, pady=4)
+
+tk.Radiobutton(mode_selection_frame, text="🔄 Both (Grade + Date)", 
+               variable=mode_var, value="both", font=("Segoe UI", 10),
+               bg=BG_CARD, fg=TEXT_PRIMARY, activebackground=BG_CARD, 
+               activeforeground=TEXT_PRIMARY, selectcolor=BG_INPUT,
+               command=update_mode_ui, cursor="hand2").pack(anchor=tk.W, pady=4)
 
 # Grade Files Section
 grade_frame = tk.LabelFrame(main_container, text="  📁 GRADE FILES  ", 
                             font=("Segoe UI", 11, "bold"), bg=BG_CARD, 
-                            fg=TEXT_PRIMARY, bd=2, relief=tk.FLAT, padx=15, pady=15)
-grade_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 12))
+                            fg=TEXT_PRIMARY, bd=0, relief=tk.FLAT, 
+                            padx=20, pady=18, highlightbackground=BORDER_COLOR,
+                            highlightthickness=1)
 
 btn_frame = tk.Frame(grade_frame, bg=BG_CARD)
-btn_frame.pack(fill=tk.X, pady=(0, 10))
+btn_frame.pack(fill=tk.X, pady=(0, 12))
 
 ttk.Button(btn_frame, text="➕ Add Files", command=add_grades, style='Dark.TButton').pack(side=tk.LEFT, padx=5)
-ttk.Button(btn_frame, text="🗑️ Clear All", command=clear_grades, style='Dark.TButton').pack(side=tk.LEFT, padx=5)
+ttk.Button(btn_frame, text="🗑️ Clear", command=clear_grades, style='Dark.TButton').pack(side=tk.LEFT, padx=5)
 
-grade_listbox = tk.Listbox(grade_frame, height=5, font=("Consolas", 9), 
+grade_listbox = tk.Listbox(grade_frame, height=4, font=("Consolas", 9), 
                            bg=BG_INPUT, fg=TEXT_PRIMARY, relief=tk.FLAT, bd=0, 
                            highlightthickness=1, highlightbackground=BORDER_COLOR,
-                           selectbackground=ACCENT_BLUE, selectforeground="white")
+                           selectbackground=ACCENT_TEAL, selectforeground="white")
 grade_listbox.pack(fill=tk.BOTH, expand=True)
+
+# Load saved grade files
+for gf in saved_grade_files:
+    if os.path.exists(gf):
+        grade_files.append(gf)
+        grade_listbox.insert(tk.END, os.path.basename(gf))
+
+# Calendar File Section
+calendar_frame = tk.LabelFrame(main_container, text="  📅 CALENDAR FILE  ", 
+                              font=("Segoe UI", 11, "bold"), bg=BG_CARD, 
+                              fg=TEXT_PRIMARY, bd=0, relief=tk.FLAT, 
+                              padx=20, pady=18, highlightbackground=BORDER_COLOR,
+                              highlightthickness=1)
+
+ttk.Button(calendar_frame, text="📂 Select Calendar", command=pick_calendar, 
+          style='Dark.TButton').pack(anchor=tk.W, pady=(0, 10))
+calendar_entry = tk.Entry(calendar_frame, textvariable=calendar_path, font=("Segoe UI", 9),
+                         bg=BG_INPUT, fg=TEXT_PRIMARY, relief=tk.FLAT, bd=0, 
+                         insertbackground="white", highlightthickness=1,
+                         highlightbackground=BORDER_COLOR)
+calendar_entry.pack(fill=tk.X, ipady=12, padx=2)
 
 # Office File Section
 office_frame = tk.LabelFrame(main_container, text="  📄 OFFICE FORMAT FILE  ", 
                             font=("Segoe UI", 11, "bold"), bg=BG_CARD, 
-                            fg=TEXT_PRIMARY, bd=2, relief=tk.FLAT, padx=15, pady=15)
-office_frame.pack(fill=tk.X, pady=(0, 12))
+                            fg=TEXT_PRIMARY, bd=0, relief=tk.FLAT, 
+                            padx=20, pady=18, highlightbackground=BORDER_COLOR,
+                            highlightthickness=1)
+office_frame.pack(fill=tk.X, pady=(0, 10))
 
-ttk.Button(office_frame, text="📂 Select File", command=pick_office, style='Dark.TButton').pack(anchor=tk.W, pady=(0, 8))
+ttk.Button(office_frame, text="📂 Select File", command=pick_office, 
+          style='Dark.TButton').pack(anchor=tk.W, pady=(0, 10))
 office_entry = tk.Entry(office_frame, textvariable=office_path, font=("Segoe UI", 9),
-                       bg=BG_INPUT, fg=TEXT_PRIMARY, relief=tk.FLAT, bd=0, insertbackground="white")
-office_entry.pack(fill=tk.X, ipady=10, padx=2)
+                       bg=BG_INPUT, fg=TEXT_PRIMARY, relief=tk.FLAT, bd=0, 
+                       insertbackground="white", highlightthickness=1,
+                       highlightbackground=BORDER_COLOR)
+office_entry.pack(fill=tk.X, ipady=12, padx=2)
 
 # Output Folder Section
 output_frame = tk.LabelFrame(main_container, text="  💾 OUTPUT FOLDER  ", 
                             font=("Segoe UI", 11, "bold"), bg=BG_CARD, 
-                            fg=TEXT_PRIMARY, bd=2, relief=tk.FLAT, padx=15, pady=15)
-output_frame.pack(fill=tk.X, pady=(0, 12))
+                            fg=TEXT_PRIMARY, bd=0, relief=tk.FLAT, 
+                            padx=20, pady=18, highlightbackground=BORDER_COLOR,
+                            highlightthickness=1)
+output_frame.pack(fill=tk.X, pady=(0, 10))
 
-ttk.Button(output_frame, text="📂 Select Folder", command=pick_output_folder, style='Dark.TButton').pack(anchor=tk.W, pady=(0, 8))
+ttk.Button(output_frame, text="📂 Select Folder", command=pick_output_folder, 
+          style='Dark.TButton').pack(anchor=tk.W, pady=(0, 10))
 output_entry = tk.Entry(output_frame, textvariable=output_path, font=("Segoe UI", 9),
-                       bg=BG_INPUT, fg=TEXT_PRIMARY, relief=tk.FLAT, bd=0, insertbackground="white")
-output_entry.pack(fill=tk.X, ipady=10, padx=2)
-
-# Processing Mode
-mode_frame = tk.LabelFrame(main_container, text="  ⚙️ PROCESSING MODE  ", 
-                          font=("Segoe UI", 11, "bold"), bg=BG_CARD, 
-                          fg=TEXT_PRIMARY, bd=2, relief=tk.FLAT, padx=15, pady=15)
-mode_frame.pack(fill=tk.X, pady=(0, 12))
-
-tk.Radiobutton(mode_frame, text="📑 Separate Files (One file per grade)", 
-               variable=mode_var, value=1, font=("Segoe UI", 10),
-               bg=BG_CARD, fg=TEXT_PRIMARY, activebackground=BG_CARD, 
-               activeforeground=TEXT_PRIMARY, selectcolor=BG_INPUT).pack(anchor=tk.W, pady=4)
-tk.Radiobutton(mode_frame, text="📦 Combined File (All grades merged)", 
-               variable=mode_var, value=2, font=("Segoe UI", 10),
-               bg=BG_CARD, fg=TEXT_PRIMARY, activebackground=BG_CARD, 
-               activeforeground=TEXT_PRIMARY, selectcolor=BG_INPUT).pack(anchor=tk.W, pady=4)
+                       bg=BG_INPUT, fg=TEXT_PRIMARY, relief=tk.FLAT, bd=0, 
+                       insertbackground="white", highlightthickness=1,
+                       highlightbackground=BORDER_COLOR)
+output_entry.pack(fill=tk.X, ipady=12, padx=2)
 
 # Start Button
 start_btn = tk.Button(main_container, text="▶️  START PROCESSING", command=run_processing,
-                     font=("Segoe UI", 13, "bold"), bg=ACCENT_GREEN, fg="white",
-                     activebackground="#0f8655", relief=tk.FLAT, cursor="hand2",
-                     padx=35, pady=16, borderwidth=0)
-start_btn.pack(pady=15)
+                     font=("Segoe UI", 14, "bold"), bg=ACCENT_GREEN, fg="white",
+                     activebackground="#059669", relief=tk.FLAT, cursor="hand2",
+                     padx=40, pady=18, borderwidth=0)
+start_btn.pack(pady=18)
 
 # Progress Bar
 progress_frame = tk.Frame(main_container, bg=BG_DARK)
 progress_frame.pack(fill=tk.X, pady=(0, 12))
 
-progress = ttk.Progressbar(progress_frame, length=600, mode="determinate", style="Dark.Horizontal.TProgressbar")
+progress = ttk.Progressbar(progress_frame, length=700, mode="determinate", 
+                          style="Dark.Horizontal.TProgressbar")
 progress.pack()
 
 # Log Section
 log_frame = tk.LabelFrame(main_container, text="  📋 PROCESSING LOG  ", 
                          font=("Segoe UI", 11, "bold"), bg=BG_CARD, 
-                         fg=TEXT_PRIMARY, bd=2, relief=tk.FLAT, padx=15, pady=15)
+                         fg=TEXT_PRIMARY, bd=0, relief=tk.FLAT, 
+                         padx=20, pady=18, highlightbackground=BORDER_COLOR,
+                         highlightthickness=1)
 log_frame.pack(fill=tk.BOTH, expand=True)
 
 log_scrollbar = tk.Scrollbar(log_frame, bg=BG_INPUT)
 log_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-log_box = tk.Text(log_frame, height=10, font=("Consolas", 9), bg=BG_INPUT, fg="#a8e6cf",
-                 relief=tk.FLAT, bd=0, wrap=tk.WORD, yscrollcommand=log_scrollbar.set,
-                 insertbackground="white")
+log_box = tk.Text(log_frame, height=8, font=("Consolas", 9), bg=BG_INPUT, 
+                 fg="#6ee7b7", relief=tk.FLAT, bd=0, wrap=tk.WORD, 
+                 yscrollcommand=log_scrollbar.set, insertbackground="white")
 log_box.pack(fill=tk.BOTH, expand=True)
 log_scrollbar.config(command=log_box.yview)
 
 # Footer
-footer = tk.Label(root, text="© 2025 Sandeep | github.com/Sandeep2062/Cube-Merge | Logo Preservation ✓ | No Corruption ✓", 
+footer = tk.Label(root, text="© 2026 Sandeep | github.com/Sandeep2062/Cube-Data-Processor", 
                  font=("Segoe UI", 8), bg=BG_DARK, fg=TEXT_SECONDARY)
-footer.pack(pady=8)
+footer.pack(pady=10)
+
+# Initialize UI
+update_mode_ui()
 
 root.mainloop()
